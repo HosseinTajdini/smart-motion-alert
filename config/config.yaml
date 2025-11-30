@@ -1,0 +1,31 @@
+# ============================
+# MOTION DETECTION CONFIG FILE
+# ============================
+
+video:
+  source: "../data/video1.mp4"          
+  fps: 600
+
+
+background:
+  method: "knn"         
+  history: 500
+  var_threshold: 16
+  detect_shadows: false
+
+preprocess:
+  blur_kernel: 3
+  threshold: 25
+  morph_kernel: 2
+  morph_iterations: 2
+  dilate_iterations: 2
+
+contours:
+  min_area: 300          
+
+alert:
+  enabled: false
+
+debug:
+  show_mask: true
+  show_contours: true
