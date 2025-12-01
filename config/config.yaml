@@ -29,3 +29,9 @@ alert:
 debug:
   show_mask: true
   show_contours: true
+
+detector:
+  enabled: true
+  conf_threshold: 0.5
+  weights_path: "yolov8n.pt"
+  allowed_classes: {"person", "bicycle", "car", "dog", "cat", "bird", "cow", "horse"}
