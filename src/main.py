@@ -3,17 +3,18 @@ import cv2 as cv
 import numpy as np
 import yaml
 import utils
-from Human_Alert import Alert
-from motion_detector import MotionDetector
+from human_alert import Alert
 from classifier import ObjectClassifier
+import time
+
 # Config
 CONFIG_PATH = "../config/config.yaml"
 with open(CONFIG_PATH, "r" , encoding="utf-8") as f:
     cfg = yaml.safe_load(f)
+
 #Video 
 video = cv.VideoCapture(cfg["video"]["source"])
-#MotionDetector
-motionDetector = MotionDetector()
+
 #Alert System 
 alert = Alert(5)
 
@@ -28,6 +29,12 @@ else:
 frame_idx = 0
 DETECT_EVERY = 3 # skip frame for optimization
 
+last_detection = None
+stale_frames = 0
+STALE_LIMIT = 5 
+
+prev_time = time.time()
+fps = 0
 #Base Loop
 while True:
     _,frame = video.read()
@@ -38,44 +45,35 @@ while True:
 
     resized_frame = utils.rescaleFrame(frame,1)
 
-    motions = motionDetector.update(resized_frame,cfg['contours']['min_area'])
+    if classifier is not None and run_detection:
+        chosen_detection = classifier.detect(resized_frame)
+        if chosen_detection is not None:
+            last_detection = chosen_detection
+            stale_frames = 0   
+        else:
+            stale_frames += 1
 
-    valid_motions = [] # for alert
-    for motion in motions:
-        x,y,w,h = motion 
+        if last_detection is not None and stale_frames < STALE_LIMIT:
+            x1,y1,x2,y2 = last_detection['bbox']
+            if cfg['debug']['show_contours']:
 
-        roi = resized_frame[y:y+h, x:x+w]
+                cv.rectangle(resized_frame,(x1,y1),(x2,y2),(0,0,255),thickness=2)
+                label_text = last_detection["label"]
+                cv.putText(resized_frame, label_text, (x1, y1-10),cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
 
-        is_valid = False # motion is valid
-
-        if classifier is not None and run_detection:
-            chosen_detection = classifier.detect(roi)
-
-            if chosen_detection is not None:
-                is_valid = True    
-
-        if  is_valid == False :
-            continue
-
-        valid_motions.append(motion)  
-
-        if cfg['debug']['show_contours']:
-
-            cv.rectangle(resized_frame,(x,y),(x+w,y+h),(0,250,0),thickness=2)
-
-            if classifier is not None and chosen_detection is not None:
-                label_text = chosen_detection["label"]
-                cv.putText(resized_frame, label_text, (x, y-10),cv.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+    #Show FPS
+    current_time = time.time()
+    delta = current_time - prev_time
+    if delta > 0:
+        fps = 1 / delta
+    prev_time = current_time
+    cv.putText(resized_frame,f"FPS: {fps:.1f}",(10, 30),cv.FONT_HERSHEY_SIMPLEX,0.7,(0, 255, 0),2)
 
     cv.imshow("Display",resized_frame)
 
     if cfg['alert']['enabled']:
-        alert.printAlert(valid_motions)
+        alert.printAlert(last_detection)
 
-
-
-    if cfg['debug']['show_mask']:
-        motionDetector.show()
     if cv.waitKey(20) & 0xFF==ord('0'):
             break
 
